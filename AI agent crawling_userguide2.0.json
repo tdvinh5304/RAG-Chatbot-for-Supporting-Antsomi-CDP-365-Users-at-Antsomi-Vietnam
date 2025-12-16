@@ -1,0 +1,665 @@
+{
+  "name": "AI agent crawling_userguide2.0",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -16
+      ],
+      "id": "0cea4ea5-9f00-4b33-81bc-c104fae099d4",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "map",
+        "url": "https://docs.antsomi.com/cdp-365-user-guide-version-2",
+        "requestOptions": {}
+      },
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawl",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -16
+      ],
+      "id": "d1e0c273-87aa-43d4-9dac-a706515452cd",
+      "name": "Map a website and get urls",
+      "credentials": {
+        "firecrawlApi": {
+          "id": "OGNA1ON27BqWBYPe",
+          "name": "Firecrawl account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        400,
+        -16
+      ],
+      "id": "5a402629-f7ea-4105-ab55-4442f95d8f61",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -480,
+        608
+      ],
+      "id": "d4c82c07-9ce1-406e-9748-517826233233",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        384,
+        864
+      ],
+      "id": "ca320eb8-2820-4644-bb6f-ddc47a827cac",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "YeI3FKUKjvPNyGt7",
+          "name": "Antsomi key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.data }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "title",
+                "value": "={{ $json.title }}"
+              },
+              {
+                "name": "url",
+                "value": "={{ $json.url }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        608,
+        848
+      ],
+      "id": "725f17ba-33f7-4cd6-92e9-baab3b93333e",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "chunkSize": 1000000000000000,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        704,
+        1056
+      ],
+      "id": "42c8c917-9115-4c64-92d4-ce16dbe3d46e",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $(\"When chat message received\").item.json.sessionId }}"
+      },
+      "id": "5602f3f4-5f31-40a4-852a-761b2a4d9524",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        528
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "postgres": {
+          "id": "BFnBmQ6cJxxQW0UO",
+          "name": "Postgres account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=## Role\n\n🧭 System Message: Retrieval-Augmented Generation (RAG) Assistant\n\nYou are a Retrieval-Augmented Generation (RAG) assistant.\nYour purpose is to answer user questions accurately and clearly by retrieving and synthesizing information from a corpus of text-based documents.\n\n## 🎯 Core Objectives\n\n- Provide accurate, relevant, and up-to-date answers using the retrieved content.\n- Be comprehensive but concise — explain enough to be clear without unnecessary detail.\n- Write in a professional, easy-to-understand tone suitable for general and academic contexts.\n- Always include the URL(s) from url field in metadata when referencing any content.\n- End every response with a friendly suggestion or invitation for the user to explore more, phrased as a question.\n- Clarify or correct any misinformation found in the user's question or retrieved content.\n\n## 🧩 Response Guidelines\n\n- Base every answer only on the information found in the documents.\n- Do not fabricate or speculate if information is missing.\n- If no relevant information is found, respond with:\n  \"I'm sorry, I couldn't find relevant information based on your documents.\"\n- Maintain a neutral, factual, and unbiased writing style.\n- When summarizing or quoting, clearly distinguish between facts and inferences.\n\n## 📚 Multi-Source Citation Format\n\nWhen you receive multiple documents from the retrieval system:\n\n1. **Primary Answer**: Use the FIRST (most relevant) document to provide your main answer. Always cite it with: `[Source 1: Title](URL)`\n\n2. **Additional Resources**: After your main answer, create a section called \"**📖 You might also find these helpful:**\" that lists 2-3 additional related documents as:\n   - [Title](URL) - Brief one-line description of what this covers\n\nExample format:\n```\n[Your main answer here based on the most relevant document]\n\nSource: [Document Title](https://docs.antsomi.com/...)\n\n---\n**📖 You might also find these helpful:**\n- [Related Topic 1](URL) - Covers additional configuration options\n- [Related Topic 2](URL) - Explains integration steps\n- [Related Topic 3](URL) - Provides troubleshooting tips\n```\n\nThis helps users discover related functionality and features in the system."
+        }
+      },
+      "id": "01f3957d-b25e-4f3a-801a-db037d2fa7c9",
+      "name": "RAG AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        1776,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1648,
+        528
+      ],
+      "id": "1f0794d6-2552-4a95-9d6f-622540f616f6",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "YeI3FKUKjvPNyGt7",
+          "name": "Antsomi key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2000,
+        640
+      ],
+      "id": "314eddc4-e1ec-413e-8a7b-222496ea6df9",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "YeI3FKUKjvPNyGt7",
+          "name": "Antsomi key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "topN": 4
+      },
+      "type": "@n8n/n8n-nodes-langchain.rerankerCohere",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        640
+      ],
+      "id": "4d2884c8-0c64-4e71-8f21-067acd8b859e",
+      "name": "Reranker Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "FRFrBPbD2s9cXAZO",
+          "name": "CohereApi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Main flow",
+        "height": 448,
+        "width": 1760
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -576,
+        -144
+      ],
+      "typeVersion": 1,
+      "id": "7c595b16-8830-4501-8592-4edac4e07cbc",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Sub flow",
+        "height": 832,
+        "width": 1760,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -576,
+        368
+      ],
+      "typeVersion": 1,
+      "id": "8bcba318-9e3e-4d6f-92b6-472832e3584b",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Chat with model",
+        "height": 1344,
+        "width": 1296,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1216,
+        -144
+      ],
+      "typeVersion": 1,
+      "id": "25444589-a878-47a7-ae28-8e4c72c740ce",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "P9tka8BxPypjQi4f",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/P9tka8BxPypjQi4f",
+          "cachedResultName": "AI agent crawling_userguide2.0"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        32
+      ],
+      "id": "e84f0db0-7ed9-48d0-8896-545558acc32f",
+      "name": "Call Sub-workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all links from the previous node\nconst links = $json.links || [];\n\n// Filter out sitemap links\nconst filtered = links.filter(link => {\n  const url = link.url || \"\";\n  return !url.endsWith(\"sitemap.xml\") && !url.endsWith(\"sitemap-pages.xml\");\n});\n\n// Map remaining links into n8n items\nreturn filtered.map(link => ({\n  json: {\n    url: link.url,\n    title: link.title || null,\n    description: link.description || null\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        -16
+      ],
+      "id": "a3bf3cda-f619-4c61-9342-7e22144e79ee",
+      "name": "Remove sitemap links and data filtering"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -256,
+        608
+      ],
+      "id": "f1e208e9-5b69-40a9-a73e-24c9e3d31747",
+      "name": "Get all the links HTML"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "h1"
+            },
+            {
+              "key": "content",
+              "cssSelector": "main",
+              "skipSelectors": "img, footer, form, nav, aside, script, style"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        -48,
+        608
+      ],
+      "id": "8cc5c01d-0c7a-4b74-bdbe-b136e4001e8b",
+      "name": "Extract content and title"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "15b9409c-a40a-435c-9334-6ab5cb9c14d1",
+              "name": "title",
+              "value": "={{ $('When Executed by Another Workflow').item.json.title || $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "e7d9a19b-5f46-4094-bc4e-a4cd3ca3804c",
+              "name": "data",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "16ba463c-d26c-4d6a-9c45-5b7f1ee449b1",
+              "name": "url",
+              "value": "={{ $('When Executed by Another Workflow').item.json.url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        176,
+        608
+      ],
+      "id": "2e7e4c22-79cf-415c-aecf-b955ba6824a4",
+      "name": "Mapping before insert to database"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": "new_userguide",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        496,
+        608
+      ],
+      "id": "438ef3c0-948b-44de-814f-2e7d88b8c33f",
+      "name": "Insert to Vector Database",
+      "credentials": {
+        "postgres": {
+          "id": "BFnBmQ6cJxxQW0UO",
+          "name": "Postgres account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "new_userguide",
+        "toolDescription": "Use RAG to look up information in the knowledgebase.",
+        "tableName": "new_userguide",
+        "topK": 20,
+        "useReranker": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        464
+      ],
+      "id": "264c900f-a0d8-4ac8-ba1d-be762028cc4b",
+      "name": "Retrieve in Vector Database",
+      "credentials": {
+        "postgres": {
+          "id": "BFnBmQ6cJxxQW0UO",
+          "name": "Postgres account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "public": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        1552,
+        320
+      ],
+      "id": "5076b20d-dab8-4b15-8058-289391203b24",
+      "name": "When chat message received",
+      "webhookId": "f7da2149-4b5e-4061-8727-41e5687dbe6f"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Map a website and get urls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map a website and get urls": {
+      "main": [
+        [
+          {
+            "node": "Remove sitemap links and data filtering",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Call Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get all the links HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert to Vector Database",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert to Vector Database",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "RAG AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "RAG AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Retrieve in Vector Database",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reranker Cohere": {
+      "ai_reranker": [
+        [
+          {
+            "node": "Retrieve in Vector Database",
+            "type": "ai_reranker",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove sitemap links and data filtering": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all the links HTML": {
+      "main": [
+        [
+          {
+            "node": "Extract content and title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract content and title": {
+      "main": [
+        [
+          {
+            "node": "Mapping before insert to database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapping before insert to database": {
+      "main": [
+        [
+          {
+            "node": "Insert to Vector Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve in Vector Database": {
+      "ai_tool": [
+        [
+          {
+            "node": "RAG AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "RAG AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d943fcd6-c268-42b6-92d6-c590770dbf90",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9cf1698c78744bb0766b4411edbac7f8f80b130309157846a741d45d6d2d951b"
+  },
+  "id": "P9tka8BxPypjQi4f",
+  "tags": []
+}
