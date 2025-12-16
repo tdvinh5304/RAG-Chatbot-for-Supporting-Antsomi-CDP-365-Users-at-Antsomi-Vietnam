@@ -126,6 +126,6 @@ The system follows a multi-stage RAG pipeline:
 
 ## Author
 
-**Tiêu Đăng Vinh**
+**Vinh Tieu Dang**
 Business Analyst Intern – Antsomi Vietnam
 Major: Digital Business & Artificial Intelligence
